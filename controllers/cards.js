@@ -34,4 +34,36 @@ const deleteCard = (req, res) => {
     });
 };
 
-module.exports = { getCards, createCard, deleteCard };
+const likeCard = (req, res, next) => {
+  const owner = req.user._id;
+
+  Card.findByIdAndUpdate(req.params.cardId, { $addToSet: { likes: owner } }, { new: true })
+    .then((card) => {
+      if (!card) {
+        return res.status(404).send({ message: 'Нет карточки с таким id' });
+      }
+      return res.status(200).send('Карточка удалена');
+    })
+    .catch(next);
+};
+
+const dislikeCard = (req, res, next) => {
+  const owner = req.user._id;
+
+  Card.findByIdAndUpdate(req.params.cardId, { $pull: { likes: owner } }, { new: true })
+    .then((card) => {
+      if (!card) {
+        return res.status(404).send({ message: 'Нет карточки с таким id' });
+      }
+      return res.status(200).send('Карточка удалена');
+    })
+    .catch(next);
+};
+
+module.exports = {
+  getCards,
+  createCard,
+  deleteCard,
+  likeCard,
+  dislikeCard,
+};
