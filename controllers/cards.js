@@ -34,7 +34,7 @@ const deleteCard = (req, res) => {
     });
 };
 
-const likeCard = (req, res, next) => {
+const likeCard = (req, res) => {
   const owner = req.user._id;
 
   Card.findByIdAndUpdate(req.params.cardId, { $addToSet: { likes: owner } }, { new: true })
@@ -44,10 +44,15 @@ const likeCard = (req, res, next) => {
       }
       return res.status(200).send('Карточка удалена');
     })
-    .catch(next);
+    .catch((err) => {
+      if (err.name === 'CastError') {
+        return res.status(400).send({ message: 'Id карточки не валидный' });
+      }
+      return res.status(500).send(err);
+    });
 };
 
-const dislikeCard = (req, res, next) => {
+const dislikeCard = (req, res) => {
   const owner = req.user._id;
 
   Card.findByIdAndUpdate(req.params.cardId, { $pull: { likes: owner } }, { new: true })
@@ -57,7 +62,12 @@ const dislikeCard = (req, res, next) => {
       }
       return res.status(200).send('Карточка удалена');
     })
-    .catch(next);
+    .catch((err) => {
+      if (err.name === 'CastError') {
+        return res.status(400).send({ message: 'Id карточки не валидный' });
+      }
+      return res.status(500).send(err);
+    });
 };
 
 module.exports = {
