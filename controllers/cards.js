@@ -1,79 +1,89 @@
 const Card = require('../models/card');
 
-const getCards = (req, res) => Card.find({})
-  .then((cards) => res.status(200).send(cards))
-  .catch((err) => res.status(500).send(err));
+const DataError = require('../errors/data_error'); // 400
+const AccessDeniedError = require('../errors/access_denied_error'); // 403
+const NotFoundError = require('../errors/not_found_error'); // 404
 
-const createCard = (req, res) => {
+const getCards = (req, res, next) => {
+  Card.find({})
+    .then((card) => {
+      res.send(card);
+    })
+    .catch(next);
+};
+
+const createCard = (req, res, next) => {
   const { name, link } = req.body;
-  const owner = req.user._id;
-
-  Card.create({ name, link, owner })
-    .then((card) => res.status(200).send({ data: card }))
+  Card.create({ name, link, owner: req.user._id })
+    .then((card) => {
+      res.status(200).send(card);
+    })
     .catch((err) => {
       if (err.name === 'ValidationError') {
-        return res.status(400).send({ message: 'Данные не прошли валидацию' });
+        next(DataError('Данные карточки не валидны.'));
+      } else {
+        next(err);
       }
-      return res.status(500).send(err);
     });
 };
 
-const deleteCard = (req, res) => {
-  Card.findOneAndRemove({ owner: req.user._id, _id: req.params.cardId })
+const deleteCard = (req, res, next) => {
+  const { _id } = req.params;
+  Card.findById(_id)
+    .orFail(() => new NotFoundError('Карточка не найдена'))
     .then((card) => {
-      if (!card) {
-        return res.status(404).send({ message: 'Нет карточки с таким id' });
+      if (JSON.stringify(req.user._id) === JSON.stringify(card.owner)) {
+        Card.findByIdAndRemove(_id)
+          .then((result) => {
+            res.send(result);
+          });
+      } else {
+        throw new AccessDeniedError('Вы не обладаете достаточными правами для удаления карточки.');
       }
-      return res.status(200).send('Карточка удалена');
+    })
+    .catch(next);
+};
+
+const likeCard = (req, res, next) => {
+  Card.findByIdAndUpdate(
+    req.params._id, {
+      $addToSet: { likes: req.user._id },
+    }, { new: true },
+  )
+    .orFail(() => new NotFoundError('Карточка не найдена'))
+    .then((card) => {
+      res.send(card);
     })
     .catch((err) => {
       if (err.name === 'CastError') {
-        return res.status(400).send({ message: 'Id карточки не валидный' });
+        next(new DataError('Данные карточки не валидны.'));
+      } else {
+        next(err);
       }
-      return res.status(500).send(err);
     });
 };
 
-const likeCard = (req, res) => {
-  const owner = req.user._id;
-
-  Card.findByIdAndUpdate(req.params.cardId, { $addToSet: { likes: owner } }, { new: true })
+const dislikeCard = (req, res, next) => {
+  Card.findByIdAndUpdate(
+    req.params._id,
+    {
+      $pull: { likes: req.user._id },
+    },
+    { new: true },
+  )
+    .orFail(() => new NotFoundError('Карточка не найдена'))
     .then((card) => {
-      if (!card) {
-        return res.status(404).send({ message: 'Нет карточки с таким id' });
-      }
-      return res.status(200).send('Карточка удалена');
+      res.send(card);
     })
     .catch((err) => {
-      if (err.name === 'CastError') {
-        return res.status(400).send({ message: 'Id карточки не валидный' });
+      if (err.message === 'CastError') {
+        next(new DataError('Пенредаваемые данныые не валидны.'));
+      } else {
+        next(err);
       }
-      return res.status(500).send(err);
-    });
-};
-
-const dislikeCard = (req, res) => {
-  const owner = req.user._id;
-
-  Card.findByIdAndUpdate(req.params.cardId, { $pull: { likes: owner } }, { new: true })
-    .then((card) => {
-      if (!card) {
-        return res.status(404).send({ message: 'Нет карточки с таким id' });
-      }
-      return res.status(200).send('Карточка удалена');
-    })
-    .catch((err) => {
-      if (err.name === 'CastError') {
-        return res.status(400).send({ message: 'Id карточки не валидный' });
-      }
-      return res.status(500).send(err);
     });
 };
 
 module.exports = {
-  getCards,
-  createCard,
-  deleteCard,
-  likeCard,
-  dislikeCard,
+  getCards, createCard, deleteCard, likeCard, dislikeCard,
 };
