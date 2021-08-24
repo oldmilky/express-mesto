@@ -96,9 +96,10 @@ const login = (req, res, next) => {
       res.cookie('jwt', token, {
         httpOnly: true,
         sameSite: true,
-      }).end(res.send({ message: 'Записано.' }));
-      // console.log(res.cookie);
-      // .send({ token });
+      }).res.cookie('jwt', token, {
+        httpOnly: true,
+        sameSite: true,
+      }).send({ message: 'Записано.' });
     })
     .catch(() => next(new AuthError('Неверный логин либо пароль')));
 };
